@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="d-flex">
+        <!-- Боковое меню -->
+        <nav class="sidebar bg-dark text-white p-3 vh-100">
+            <h4>Меню</h4>
+            <ul class="nav flex-column">
+                <li class="nav-item"><a class="nav-link text-white" href="/dashboard">Дашборд</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/logout">Выход</a></li>
+            </ul>
+        </nav>
+        
+        <!-- Основной контент -->
+        <div class="container-fluid p-4">
+            <h2>Ваши проекты</h2>
+            <button class="btn btn-primary my-3" data-bs-toggle="modal" data-bs-target="#addProjectModal">Добавить проект</button>
+            <div class="row">
+                {% if projects %}
+                    {% for project in projects %}
+                    <div class="col-md-4">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ project.name }}</h5>
+                                <p class="card-text">
+                                    <small class="text-muted">Создан: {{ project.date_created.strftime('%Y-%m-%d') }}</small>
+                                </p>
+                                <a href="{{ url_for('project_settings', project_id=project.id) }}" class="btn btn-secondary">Настройки</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p>У вас пока нет проектов.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно добавления проекта -->
+    <div class="modal fade" id="addProjectModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить проект</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addProjectForm">
+                        <div class="mb-3">
+                            <label for="project_name" class="form-label">Название проекта</label>
+                            <input type="text" class="form-control" id="project_name" name="project_name" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Создать</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('addProjectForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            fetch('/add_project', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json()).then(data => {
+                if (data.message) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert(data.error);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

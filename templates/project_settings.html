@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Настройки проекта: {{ project.name }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='settings.css') }}">
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>Настройки проекта: {{ project.name }}</h2>
+            <a href="{{ url_for('logout') }}" class="btn btn-danger">Выйти</a>
+        </div>
+
+        <!-- Сообщения -->
+        <div id="messages"></div>
+
+        <!-- Поле для промта бота -->
+        <div class="mb-3">
+            <label for="bot_prompt" class="form-label">Инструкция для бота</label>
+            <textarea class="form-control" id="bot_prompt" rows="3" placeholder="Введите инструкцию для бота...">{{ project.bot_prompt }}</textarea>
+        </div>
+
+        <!-- Стартовое сообщение бота -->
+        <div class="mb-3">
+            <label for="bot_message" class="form-label">Стартовое сообщение бота</label>
+            <textarea class="form-control" id="bot_message" rows="3" placeholder="Введите стартовое сообщение...">{{ project.bot_message }}</textarea>
+        </div>
+
+        <!-- Ползунок температуры -->
+        <div class="mb-3">
+            <label for="temperature" class="form-label">Температура: <span id="tempValue">{{ project.temperature }}</span></label>
+            <input type="range" class="form-range" id="temperature" min="0" max="1" step="0.01" value="{{ project.temperature }}">
+        </div>
+
+        <!-- Максимальное количество токенов -->
+        <div class="mb-3">
+            <label for="max_tokens" class="form-label">Максимальное количество токенов</label>
+            <input type="number" class="form-control" id="max_tokens" value="{{ project.max_tokens }}">
+        </div>
+
+        <!-- Управление активностью агента -->
+        <div class="mb-3">
+            <label class="form-label">Управление активностью агента</label>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="disable_agent" {% if project.disable_agent %}checked{% endif %}>
+                <label class="form-check-label" for="disable_agent">Остановить бота для выполнения сценария</label>
+            </div>
+            <select class="form-select mt-2" id="agent_timeout">
+                <option value="1" {% if project.agent_timeout == 1 %}selected{% endif %}>1 час</option>
+                <option value="3" {% if project.agent_timeout == 3 %}selected{% endif %}>3 часа</option>
+                <option value="6" {% if project.agent_timeout == 6 %}selected{% endif %}>6 часов</option>
+            </select>
+        </div>
+
+        <!-- Выбор модели -->
+        <div class="mb-3">
+            <label class="form-label">Выбор модели</label>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="model" id="gemini" value="Gemini" {% if project.model == 'Gemini' %}checked{% endif %}>
+                <label class="form-check-label" for="gemini">Gemini</label>
+            </div>
+        </div>
+
+        <!-- Буфер сообщений -->
+        <div class="mb-3">
+            <label for="message_buffer" class="form-label">Буфер сообщений</label>
+            <input type="number" class="form-control" id="message_buffer" value="{{ project.message_buffer }}">
+        </div>
+
+        <!-- Защита от спама -->
+        <div class="mb-3">
+            <label class="form-label">Защита от спама</label>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="spam_protection" {% if project.spam_protection %}checked{% endif %}>
+                <label class="form-check-label" for="spam_protection">Включить</label>
+            </div>
+        </div>
+
+        <!-- Отложенная отправка -->
+        <div class="mb-3">
+            <label class="form-label">Отложенная отправка</label>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="delayed_sending" {% if project.delayed_sending %}checked{% endif %}>
+                <label class="form-check-label" for="delayed_sending">Включить</label>
+            </div>
+        </div>
+
+        <!-- API-ключ -->
+        <div class="mb-3">
+            <label for="api_key" class="form-label">Свой API-ключ</label>
+            <input type="text" class="form-control" id="api_key" placeholder="Введите API-ключ" value="{{ project.api_key }}">
+            <button type="button" class="btn btn-secondary mt-2" onclick="saveSettings()">Применить</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Функция для отправки данных на сервер
+        function saveSettings() {
+            const settings = {
+                bot_prompt: document.getElementById('bot_prompt').value,
+                bot_message: document.getElementById('bot_message').value,
+                temperature: document.getElementById('temperature').value,
+                max_tokens: document.getElementById('max_tokens').value,
+                disable_agent: document.getElementById('disable_agent').checked,
+                agent_timeout: document.getElementById('agent_timeout').value,
+                model: document.querySelector('input[name="model"]:checked')?.value || 'Gemini',
+                message_buffer: document.getElementById('message_buffer').value,
+                spam_protection: document.getElementById('spam_protection').checked,
+                delayed_sending: document.getElementById('delayed_sending').checked,
+                api_key: document.getElementById('api_key').value
+            };
+
+            fetch(`/project/{{ project.id }}/save-settings`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(settings)
+            })
+            .then(response => response.json())
+            .then(data => {
+                const messagesDiv = document.getElementById('messages');
+                messagesDiv.innerHTML = '';
+                if (data.message) {
+                    messagesDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+                } else if (data.error) {
+                    messagesDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                }
+                setTimeout(() => messagesDiv.innerHTML = '', 3000); // Убираем сообщение через 3 секунды
+            })
+            .catch(error => console.error('Ошибка:', error));
+        }
+
+        // Обновление значения температуры
+        function updateTemperatureValue() {
+            document.getElementById('tempValue').textContent = document.getElementById('temperature').value;
+            saveSettings(); // Сохраняем при изменении
+        }
+
+        // Привязываем сохранение к изменениям
+        document.querySelectorAll('input, textarea, select').forEach(element => {
+            element.addEventListener('change', saveSettings);
+        });
+        document.getElementById('temperature').addEventListener('input', updateTemperatureValue);
+    </script>
+</body>
+</html>
