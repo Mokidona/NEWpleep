@@ -15,18 +15,21 @@ class Project(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     date_created = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Новые поля для настроек
-    bot_prompt = db.Column(db.Text, default='')  # Инструкция для бота
-    bot_message = db.Column(db.Text, default='')  # Стартовое сообщение бота
-    temperature = db.Column(db.Float, default=0.5)  # Температура
-    max_tokens = db.Column(db.Integer, default=1024)  # Максимальное количество токенов
-    disable_agent = db.Column(db.Boolean, default=False)  # Остановить бота
-    agent_timeout = db.Column(db.Integer, default=1)  # Время остановки (в часах)
-    model = db.Column(db.String(50), default='Gemini')  # Выбор модели
-    message_buffer = db.Column(db.Integer, default=5)  # Буфер сообщений
-    spam_protection = db.Column(db.Boolean, default=False)  # Защита от спама
-    delayed_sending = db.Column(db.Boolean, default=False)  # Отложенная отправка
-    api_key = db.Column(db.String(200), default='')  # Свой API-ключ
+    # Настройки бота
+    bot_prompt = db.Column(db.Text, default='')
+    bot_message = db.Column(db.Text, default='')
+    temperature = db.Column(db.Float, default=0.5)
+    max_tokens = db.Column(db.Integer, default=1024)
+    disable_agent = db.Column(db.Boolean, default=False)
+    agent_timeout = db.Column(db.Integer, default=1)
+    model = db.Column(db.String(50), default='Gemini')
+    message_buffer = db.Column(db.Integer, default=5)
+    spam_protection = db.Column(db.Boolean, default=False)
+    delayed_sending = db.Column(db.Boolean, default=False)
+    api_key = db.Column(db.String(200), default='')
+    
+    # Интеграция с Instagram
+    instagram_token = db.Column(db.String(500), default='')
 
     def __repr__(self):
         return f'<Project {self.name}>'

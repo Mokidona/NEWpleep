@@ -3,12 +3,21 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 from datetime import datetime
+import requests
+import secrets
 
 # Инициализация приложения
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key')
+
+# Instagram OAuth конфигурация
+INSTAGRAM_CLIENT_ID = os.getenv('INSTAGRAM_CLIENT_ID', '')  # Получите в Meta Developer Console
+INSTAGRAM_CLIENT_SECRET = os.getenv('INSTAGRAM_CLIENT_SECRET', '')  # Получите в Meta Developer Console
+INSTAGRAM_REDIRECT_URI = os.getenv('INSTAGRAM_REDIRECT_URI', 'http://localhost:5100/instagram/callback')
+INSTAGRAM_AUTH_URL = 'https://api.instagram.com/oauth/authorize'
+INSTAGRAM_TOKEN_URL = 'https://api.instagram.com/oauth/access_token'
 
 db = SQLAlchemy(app)
 
@@ -35,10 +44,82 @@ class Project(db.Model):
     spam_protection = db.Column(db.Boolean, default=False)
     delayed_sending = db.Column(db.Boolean, default=False)
     api_key = db.Column(db.String(200), default='')
+    instagram_token = db.Column(db.String(500), default='')  # Добавляем поле для токена Instagram
 
 # Создание базы данных
 with app.app_context():
     db.create_all()
+
+# Маршрут для инициирования Instagram авторизации
+@app.route('/project/<int:project_id>/instagram/auth')
+def instagram_auth(project_id):
+    if 'user_id' not in session:
+        flash('Сначала войдите в систему.', 'error')
+        return redirect(url_for('login'))
+    
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != session['user_id']:
+        flash('У вас нет доступа к этому проекту.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Генерируем state для защиты от CSRF
+    state = secrets.token_hex(16)
+    session['instagram_state'] = state
+    session['project_id'] = project_id
+    
+    # Формируем URL для авторизации в Instagram
+    auth_url = f"{INSTAGRAM_AUTH_URL}?client_id={INSTAGRAM_CLIENT_ID}&redirect_uri={INSTAGRAM_REDIRECT_URI}&scope=user_profile,user_media&response_type=code&state={state}"
+    
+    return redirect(auth_url)
+
+# Обработчик callback от Instagram
+@app.route('/instagram/callback')
+def instagram_callback():
+    if 'user_id' not in session:
+        flash('Сначала войдите в систему.', 'error')
+        return redirect(url_for('login'))
+    
+    code = request.args.get('code')
+    state = request.args.get('state')
+    error = request.args.get('error')
+    
+    # Проверяем state для защиты от CSRF
+    if state != session.get('instagram_state'):
+        flash('Ошибка проверки безопасности.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    if error:
+        flash(f'Ошибка авторизации Instagram: {error}', 'error')
+        return redirect(url_for('project_settings', project_id=session.get('project_id')))
+    
+    # Получаем токен доступа
+    token_payload = {
+        'client_id': INSTAGRAM_CLIENT_ID,
+        'client_secret': INSTAGRAM_CLIENT_SECRET,
+        'grant_type': 'authorization_code',
+        'redirect_uri': INSTAGRAM_REDIRECT_URI,
+        'code': code
+    }
+    
+    try:
+        response = requests.post(INSTAGRAM_TOKEN_URL, data=token_payload)
+        token_data = response.json()
+        
+        if 'access_token' in token_data:
+            # Сохраняем токен в базе данных
+            project_id = session.get('project_id')
+            project = Project.query.get_or_404(project_id)
+            project.instagram_token = token_data['access_token']
+            db.session.commit()
+            
+            flash('Instagram авторизация успешна!', 'success')
+        else:
+            flash(f'Не удалось получить токен Instagram: {token_data.get("error_message", "Неизвестная ошибка")}', 'error')
+    
+    except Exception as e:
+        flash(f'Ошибка при обработке ответа Instagram: {str(e)}', 'error')
+    
+    return redirect(url_for('project_settings', project_id=session.get('project_id')))
 
 # Маршрут для страницы настроек (GET)
 @app.route('/project/<int:project_id>/settings', methods=['GET'])
